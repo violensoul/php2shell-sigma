@@ -1,0 +1,33 @@
+title: PHP OOM in Multipart Parser (Unknown:0) - php2shell Probing (keywords)
+name: php2shell_oom_multipart_keywords
+id: 71e46192-6e9b-4f3e-bd95-1a22def040cd
+status: experimental
+description: |
+    Field-agnostic variant of php2shell_oom_multipart that matches the whole event instead of a named
+    message field. Use when your pipeline has no single raw-message field. The wildcard binds the three
+    markers to one line in the correct order, which keeps false positives low. Equivalent intent to
+    b08c8798-6b84-4854-90b7-8ae21ea3ef52.
+references:
+    - https://github.com/assetnote/php2shell-scanner
+    - https://calif.io/php2shell/
+author: Wayne
+date: 2026-10-22
+tags:
+    - attack.initial_access
+    - attack.t1190
+    - attack.impact
+    - attack.t1499.003
+    - cve.2026.109618
+    - cve.2026.109619
+logsource:
+    category: application
+    product: php
+    definition: 'PHP / PHP-FPM / web-server error log carrying PHP fatal errors.'
+detection:
+    keywords:
+        - 'Allowed memory size of * bytes exhausted * in Unknown on line 0'
+    condition: keywords
+falsepositives:
+    - Legitimate very large multipart uploads on an under-provisioned memory_limit.
+    - Load / stress testing.
+level: high

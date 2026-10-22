@@ -1,0 +1,27 @@
+title: PHP Multipart OOM Burst from Single Source - Active php2shell Scan/DoS
+id: 9f3b1c2a-0d4e-4a7c-8b61-2e5f7a9c1d33
+status: experimental
+description: |
+    Correlation on top of php2shell_oom_multipart: a single OOM-in-Unknown can be noise, but repeated
+    hits from one source in a short window indicate active php2shell scanning or a memory-exhaustion
+    DoS. Load the base rule together with this one (sigma-cli loads a whole directory, so keeping both
+    files in this pack is enough). Tune the threshold to your real upload traffic.
+references:
+    - https://github.com/assetnote/php2shell-scanner
+author: Wayne
+date: 2026-10-22
+tags:
+    - attack.t1190
+    - attack.t1499.003
+    - cve.2026.109618
+    - cve.2026.109619
+correlation:
+    type: event_count
+    rules:
+        - php2shell_oom_multipart      # references the base rule by its `name`
+    group-by:
+        - src_ip
+    timespan: 5m
+    condition:
+        gte: 5
+level: critical

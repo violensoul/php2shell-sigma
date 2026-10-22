@@ -1,0 +1,46 @@
+title: PHP OOM in Multipart Parser (Unknown:0) - php2shell Probing
+name: php2shell_oom_multipart
+id: b08c8798-6b84-4854-90b7-8ae21ea3ef52
+status: experimental
+description: |
+    Detects PHP "Allowed memory size exhausted" fatal errors raised in "Unknown on line 0",
+    i.e. the out-of-memory condition happened inside PHP's SAPI/rfc1867 multipart request parser
+    before any script executed. This is the memory-amplification signature used by php2shell
+    scanners/exploits (CVE-2026-109618 / CVE-2026-109619): a small multipart body with thousands of
+    duplicate part-headers or deeply nested array keys inflates allocation far beyond its wire size.
+    A normal application OOM reports a real file and line, so the "Unknown on line 0" context is the
+    discriminator that keeps this rule high-fidelity.
+references:
+    - https://github.com/assetnote/php2shell-scanner
+    - https://calif.io/php2shell/
+author: Wayne
+date: 2026-10-22
+tags:
+    - attack.initial_access
+    - attack.t1190          # Exploit Public-Facing Application
+    - attack.impact
+    - attack.t1499.003      # Endpoint DoS: Application Exhaustion Flood
+    - cve.2026.109618
+    - cve.2026.109619
+logsource:
+    category: application
+    product: php
+    definition: 'PHP error log, PHP-FPM error log, or web-server (apache/nginx) error log carrying PHP fatal errors. Map the raw log line to the field named by your pipeline (message/msg/log/@message). Requires log_errors=On; for PHP-FPM also catch_workers_output=yes so worker stderr reaches the log.'
+detection:
+    sel_oom:
+        message|contains|all:
+            - 'Allowed memory size of'
+            - 'bytes exhausted'
+    sel_startup_context:
+        message|contains: 'in Unknown on line 0'
+    condition: sel_oom and sel_startup_context
+fields:
+    - src_ip
+    - http_host
+    - http_uri
+    - message
+falsepositives:
+    - Legitimate very large multipart uploads on an under-provisioned memory_limit. Allowlist the
+      known heavy-upload endpoint, or rely on the companion correlation rule to require a burst.
+    - Load / stress testing.
+level: high
