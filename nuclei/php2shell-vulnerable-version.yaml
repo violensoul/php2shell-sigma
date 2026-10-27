@@ -1,0 +1,81 @@
+id: php2shell-vulnerable-version
+
+info:
+  name: php2shell (CVE-2026-109618 / CVE-2026-109619) — PHP vulnerable/EOL version exposure
+  author: violensoul
+  severity: high
+  description: |
+    Passively flags a PHP build whose advertised version is below the php2shell
+    fix-floor (8.2.35 / 8.3.36 / 8.4.27 / 8.5.12, released 2026-10-21), or on any
+    EOL branch (<= 8.1), which never receives a backport.
+
+    Detection only: this template sends a single benign GET and inspects the
+    Server / X-Powered-By response headers. It does NOT send any multipart body,
+    does NOT touch session.upload_progress, and does NOT attempt exploitation.
+
+    This is a version-exposure check, not proof of exploitability: on PHP-FPM /
+    php-cgi the public php2shell RCE chains do not land (the worker respawns on
+    OOM) — treat a match as "attack surface present, confirm SAPI and reachability
+    separately". A patched build (e.g. 8.4.27+) is correctly NOT matched.
+
+    Clean-room template authored from public PHP security-advisory data. It is NOT
+    derived from, and copies no content from, any third-party Nuclei template.
+  reference:
+    - https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w
+    - https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp
+    - https://github.com/violensoul/php2shell-sigma
+  classification:
+    cve-id: CVE-2026-109618,CVE-2026-109619
+    cvss-metrics: CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H
+    cvss-score: 9.2
+  metadata:
+    verified: false
+    shodan-query: 'http.component:"PHP"'
+  tags: cve,cve2026,php,php2shell,rce,detect,version,oast-safe
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    host-redirects: true
+    max-redirects: 2
+
+    extractors:
+      # internal: feeds the DSL matcher below
+      - type: regex
+        name: version
+        internal: true
+        part: header
+        group: 1
+        regex:
+          - "(?i)(?:X-Powered-By|Server)\\s*:[^\\r\\n]*?PHP/([0-9]+\\.[0-9]+\\.[0-9]+)"
+      # visible: reported in Nuclei output
+      - type: regex
+        name: php_version
+        part: header
+        group: 1
+        regex:
+          - "(?i)(?:X-Powered-By|Server)\\s*:[^\\r\\n]*?PHP/([0-9]+\\.[0-9]+\\.[0-9]+)"
+
+    matchers-condition: and
+    matchers:
+      - type: regex
+        part: header
+        regex:
+          - "(?i)(?:X-Powered-By|Server)\\s*:[^\\r\\n]*?PHP/[0-9]+\\.[0-9]+\\.[0-9]+"
+
+      - type: dsl
+        name: below-fix-floor-or-eol
+        dsl:
+          - >-
+            compare_versions(version, '< 8.2.0') ||
+            compare_versions(version, '>= 8.2.0', '< 8.2.35') ||
+            compare_versions(version, '>= 8.3.0', '< 8.3.36') ||
+            compare_versions(version, '>= 8.4.0', '< 8.4.27') ||
+            compare_versions(version, '>= 8.5.0', '< 8.5.12')
+# Notes:
+#   * expose_php=Off strips X-Powered-By, and a reverse proxy / WAF may rewrite or
+#     drop the Server header — a NON-match is therefore not proof of "patched".
+#   * "< 8.2.0" covers every EOL branch (7.x, 5.x, 8.0, 8.1) as vulnerable-forever.
+#   * To verify a build is genuinely patched you must check the package build date,
+#     not only the version string (8.4.27 / 8.5.12 were rebuilt 2026-10-22).
